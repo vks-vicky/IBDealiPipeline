@@ -1,0 +1,41 @@
+<mat-card *ngIf="deal">
+
+  <h2>{{ deal.clientName }}</h2>
+  <p>{{ deal.summary }}</p>
+
+  <p><strong>Sector:</strong> {{ deal.sector }}</p>
+  <p><strong>Type:</strong> {{ deal.dealType }}</p>
+
+  <p *ngIf="isAdmin">
+    <strong>Value:</strong> {{ deal.dealValue | number }}
+  </p>
+
+  <div>
+    <strong>Stage:</strong>
+    <mat-select [value]="deal.currentStage"
+                (selectionChange)="updateStage($event.value)">
+      <mat-option *ngFor="let s of stages" [value]="s">
+        {{ s }}
+      </mat-option>
+    </mat-select>
+  </div>
+
+  <br>
+
+  <button mat-button (click)="edit()">Edit</button>
+
+  <hr>
+
+  <h3>Notes</h3>
+
+  <div *ngFor="let n of deal.notes">
+    <p>{{ n.note }}</p>
+    <small>{{ n.timestamp | date:'short' }}</small>
+    <hr>
+  </div>
+
+  <textarea [(ngModel)]="newNote" rows="3"></textarea>
+  <br>
+  <button mat-raised-button (click)="addNote()">Add Note</button>
+
+</mat-card>

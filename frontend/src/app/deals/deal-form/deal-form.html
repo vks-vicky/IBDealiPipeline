@@ -1,0 +1,36 @@
+<mat-card>
+    <h2>{{ isEdit ? 'Edit Deal' : 'Create Deal' }}</h2>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+
+        <mat-form-field class="full">
+            <mat-label>Client Name</mat-label>
+            <input matInput formControlName="clientName">
+        </mat-form-field>
+
+        <mat-form-field class="full">
+            <mat-label>Sector</mat-label>
+            <input matInput formControlName="sector">
+        </mat-form-field>
+
+        <mat-form-field class="full">
+            <mat-label>Deal Type</mat-label>
+            <input matInput formControlName="dealType">
+        </mat-form-field>
+
+        <mat-form-field class="full">
+            <mat-label>Summary</mat-label>
+            <textarea matInput formControlName="summary"></textarea>
+        </mat-form-field>
+
+        <!-- ADMIN ONLY -->
+        <mat-form-field class="full" *ngIf="isAdmin">
+            <mat-label>Deal Value</mat-label>
+            <input matInput type="number" formControlName="dealValue">
+        </mat-form-field>
+
+        <button mat-raised-button color="primary">
+            {{ isEdit ? 'Update' : 'Create' }}
+        </button>
+    </form>
+</mat-card>
