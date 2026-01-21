@@ -1,31 +1,89 @@
-<mat-card>
-  <h2>Create User</h2>
+<div class="dialog-header">
+  <h2 mat-dialog-title>Create New User</h2>
+  <button mat-icon-button mat-dialog-close class="close-button">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
 
-  <form [formGroup]="form" (ngSubmit)="submit()">
+<mat-dialog-content class="dialog-content">
+  <form [formGroup]="form" class="user-form">
 
-    <mat-form-field class="full">
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
       <mat-label>Username</mat-label>
-      <input matInput formControlName="username">
+      <input matInput formControlName="username" placeholder="Enter username">
+      <mat-icon matPrefix>person</mat-icon>
+      <mat-error *ngIf="form.get('username')?.hasError('required')">
+        Username is required
+      </mat-error>
     </mat-form-field>
 
-    <mat-form-field class="full">
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
       <mat-label>Email</mat-label>
-      <input matInput formControlName="email">
+      <input matInput formControlName="email" type="email" placeholder="Enter email address">
+      <mat-icon matPrefix>email</mat-icon>
+      <mat-error *ngIf="form.get('email')?.hasError('required')">
+        Email is required
+      </mat-error>
+      <mat-error *ngIf="form.get('email')?.hasError('email')">
+        Please enter a valid email
+      </mat-error>
     </mat-form-field>
 
-    <mat-form-field class="full">
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
       <mat-label>Password</mat-label>
-      <input matInput type="password" formControlName="password">
+      <input 
+        matInput 
+        [type]="hidePassword ? 'password' : 'text'" 
+        formControlName="password"
+        placeholder="Enter password"
+      >
+      <mat-icon matPrefix>lock</mat-icon>
+      <button 
+        mat-icon-button 
+        matSuffix 
+        type="button"
+        (click)="hidePassword = !hidePassword"
+      >
+        <mat-icon>{{hidePassword ? 'visibility_off' : 'visibility'}}</mat-icon>
+      </button>
+      <mat-error *ngIf="form.get('password')?.hasError('required')">
+        Password is required
+      </mat-error>
     </mat-form-field>
 
-    <mat-form-field class="full">
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
       <mat-label>Role</mat-label>
-      <mat-select formControlName="role">
-        <mat-option value="USER">USER</mat-option>
-        <mat-option value="ADMIN">ADMIN</mat-option>
+      <mat-select formControlName="role" placeholder="Select user role">
+        <mat-option value="USER">
+          <mat-icon>person</mat-icon>
+          User
+        </mat-option>
+        <mat-option value="ADMIN">
+          <mat-icon>admin_panel_settings</mat-icon>
+          Admin
+        </mat-option>
       </mat-select>
+      <mat-icon matPrefix>badge</mat-icon>
+      <mat-error *ngIf="form.get('role')?.hasError('required')">
+        Role is required
+      </mat-error>
     </mat-form-field>
 
-    <button mat-raised-button color="primary">Create</button>
   </form>
-</mat-card>
+</mat-dialog-content>
+
+<mat-dialog-actions class="dialog-actions">
+  <button mat-stroked-button (click)="close()" [disabled]="loading">
+    Cancel
+  </button>
+  <button 
+    mat-raised-button 
+    color="primary" 
+    (click)="submit()" 
+    [disabled]="form.invalid || loading"
+    class="create-button"
+  >
+    <mat-icon *ngIf="!loading">person_add</mat-icon>
+    <span>{{ loading ? 'Creating...' : 'Create User' }}</span>
+  </button>
+</mat-dialog-actions>

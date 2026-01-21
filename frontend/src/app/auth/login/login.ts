@@ -5,6 +5,9 @@ import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { trigger, transition, style, animate } from '@angular/animations';
 import { AuthService } from '../../core/services/auth';
 
 @Component({
@@ -15,16 +18,27 @@ import { AuthService } from '../../core/services/auth';
     ReactiveFormsModule,
     MatCardModule,
     MatInputModule,
-    MatButtonModule
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule
   ],
   templateUrl: './login.html',
-  styleUrl: './login.scss'
+  styleUrl: './login.scss',
+  animations: [
+    trigger('fadeIn', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'translateY(-10px)' }),
+        animate('300ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
+      ])
+    ])
+  ]
 })
 
 export class Login {
 
   loading = false;
   error: string | null = null;
+  hidePassword = true;
   form: any;
 
   constructor(

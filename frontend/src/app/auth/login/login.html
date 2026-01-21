@@ -1,23 +1,81 @@
 <div class="login-container">
-    <mat-card class="login-card">
-        <h2>Investment Banking Portal</h2>
+    <div class="login-background">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+    </div>
+    
+    <div class="login-card">
+        <div class="card-header">
+            <div class="logo-container">
+                <mat-icon class="logo-icon">business_center</mat-icon>
+            </div>
+            <h1 class="portal-title">DealFlow</h1>
+            <p class="portal-subtitle">Sign in to manage your deal pipeline</p>
+        </div>
 
-        <form [formGroup]="form" (ngSubmit)="submit()">
-            <mat-form-field appearance="outline" class="full">
+        <form [formGroup]="form" (ngSubmit)="submit()" class="login-form">
+            <mat-form-field appearance="outline" class="full-width" floatLabel="always">
                 <mat-label>Username</mat-label>
-                <input matInput formControlName="username" />
+                <input 
+                    matInput 
+                    formControlName="username" 
+                    autocomplete="username"
+                    placeholder="Enter your username"
+                />
+                <mat-icon matPrefix>person</mat-icon>
+                <mat-error *ngIf="form.get('username')?.hasError('required')">
+                    Username is required
+                </mat-error>
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="full">
+            <mat-form-field appearance="outline" class="full-width" floatLabel="always">
                 <mat-label>Password</mat-label>
-                <input matInput type="password" formControlName="password" />
+                <input 
+                    matInput 
+                    [type]="hidePassword ? 'password' : 'text'" 
+                    formControlName="password"
+                    autocomplete="current-password"
+                    placeholder="Enter your password"
+                />
+                <mat-icon matPrefix>lock</mat-icon>
+                <button 
+                    mat-icon-button 
+                    matSuffix 
+                    type="button"
+                    (click)="hidePassword = !hidePassword"
+                    [attr.aria-label]="'Hide password'"
+                    [attr.aria-pressed]="!hidePassword"
+                >
+                    <mat-icon>{{hidePassword ? 'visibility_off' : 'visibility'}}</mat-icon>
+                </button>
+                <mat-error *ngIf="form.get('password')?.hasError('required')">
+                    Password is required
+                </mat-error>
             </mat-form-field>
 
-            <div class="error" *ngIf="error">{{ error }}</div>
+            <div class="error-message" *ngIf="error" @fadeIn>
+                <mat-icon>error_outline</mat-icon>
+                <span>{{ error }}</span>
+            </div>
 
-            <button mat-raised-button color="primary" class="full" [disabled]="loading">
-                {{ loading ? 'Signing in...' : 'Login' }}
+            <button 
+                mat-raised-button 
+                color="primary" 
+                class="login-button" 
+                type="submit"
+                [disabled]="loading || form.invalid"
+            >
+                <span *ngIf="!loading">Sign In</span>
+                <span *ngIf="loading" class="loading-content">
+                    <mat-spinner diameter="20" class="button-spinner"></mat-spinner>
+                    Signing in...
+                </span>
             </button>
         </form>
-    </mat-card>
+
+        <div class="card-footer">
+            <p class="footer-text">Secure access to your deal management system</p>
+        </div>
+    </div>
 </div>

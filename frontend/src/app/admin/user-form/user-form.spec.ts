@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { Router } from '@angular/router';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { UserForm } from './user-form';
 import { UserService } from '../../core/services/user';
 
@@ -8,22 +8,23 @@ describe('UserForm', () => {
   let fixture: ComponentFixture<UserForm>;
   let component: UserForm;
   let userMock: any;
-  let routerMock: any;
+  let dialogRefMock: any;
 
   beforeEach(async () => {
     userMock = {
       create: vi.fn()
     };
 
-    routerMock = {
-      navigate: vi.fn()
+    dialogRefMock = {
+      close: vi.fn()
     };
 
     await TestBed.configureTestingModule({
       imports: [UserForm],
       providers: [
         { provide: UserService, useValue: userMock },
-        { provide: Router, useValue: routerMock }
+        { provide: MatDialogRef, useValue: dialogRefMock },
+        { provide: MAT_DIALOG_DATA, useValue: {} }
       ]
     }).compileComponents();
 
@@ -55,7 +56,7 @@ describe('UserForm', () => {
     component.submit();
 
     expect(userMock.create).not.toHaveBeenCalled();
-    expect(routerMock.navigate).not.toHaveBeenCalled();
+    expect(dialogRefMock.close).not.toHaveBeenCalled();
   });
 
   it('should create user and navigate on valid submit', () => {
@@ -77,6 +78,6 @@ describe('UserForm', () => {
       role: 'ADMIN'
     });
 
-    expect(routerMock.navigate).toHaveBeenCalledWith(['/admin']);
+    expect(dialogRefMock.close).toHaveBeenCalledWith(true);
   });
 });

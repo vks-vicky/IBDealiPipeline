@@ -1,0 +1,346 @@
+{
+  "family": "ibpipeline-complete-stack",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "mongodb",
+      "image": "mongo:8.0",
+      "cpu": 512,
+      "memory": 1024,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 27017,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "MONGO_INITDB_ROOT_USERNAME",
+          "value": "admin"
+        },
+        {
+          "name": "MONGO_INITDB_DATABASE",
+          "value": "ibpipeline"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "MONGO_INITDB_ROOT_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:ibpipeline/mongodb/password"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "mongodb-data",
+          "containerPath": "/data/db"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ibpipeline-mongodb",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "mongodb"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "mongosh --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 40
+      }
+    },
+    {
+      "name": "zookeeper",
+      "image": "confluentinc/cp-zookeeper:7.6.0",
+      "cpu": 256,
+      "memory": 512,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 2181,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "ZOOKEEPER_CLIENT_PORT",
+          "value": "2181"
+        },
+        {
+          "name": "ZOOKEEPER_TICK_TIME",
+          "value": "2000"
+        },
+        {
+          "name": "ZOOKEEPER_SYNC_LIMIT",
+          "value": "2"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "zookeeper-data",
+          "containerPath": "/var/lib/zookeeper/data"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ibpipeline-zookeeper",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "zookeeper"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "nc -z localhost 2181 || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 20
+      }
+    },
+    {
+      "name": "kafka",
+      "image": "confluentinc/cp-kafka:7.6.0",
+      "cpu": 512,
+      "memory": 1024,
+      "essential": true,
+      "dependsOn": [
+        {
+          "containerName": "zookeeper",
+          "condition": "HEALTHY"
+        }
+      ],
+      "portMappings": [
+        {
+          "containerPort": 9092,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "KAFKA_BROKER_ID",
+          "value": "1"
+        },
+        {
+          "name": "KAFKA_ZOOKEEPER_CONNECT",
+          "value": "localhost:2181"
+        },
+        {
+          "name": "KAFKA_ADVERTISED_LISTENERS",
+          "value": "PLAINTEXT://localhost:9092"
+        },
+        {
+          "name": "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
+          "value": "PLAINTEXT:PLAINTEXT"
+        },
+        {
+          "name": "KAFKA_INTER_BROKER_LISTENER_NAME",
+          "value": "PLAINTEXT"
+        },
+        {
+          "name": "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR",
+          "value": "1"
+        },
+        {
+          "name": "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR",
+          "value": "1"
+        },
+        {
+          "name": "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR",
+          "value": "1"
+        },
+        {
+          "name": "KAFKA_AUTO_CREATE_TOPICS_ENABLE",
+          "value": "true"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "kafka-data",
+          "containerPath": "/var/lib/kafka/data"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ibpipeline-kafka",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "kafka"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    },
+    {
+      "name": "backend",
+      "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ibpipeline-backend:latest",
+      "cpu": 512,
+      "memory": 1024,
+      "essential": true,
+      "dependsOn": [
+        {
+          "containerName": "mongodb",
+          "condition": "HEALTHY"
+        },
+        {
+          "containerName": "kafka",
+          "condition": "HEALTHY"
+        }
+      ],
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "prod"
+        },
+        {
+          "name": "SERVER_PORT",
+          "value": "8080"
+        },
+        {
+          "name": "SPRING_DATA_MONGODB_URI",
+          "value": "mongodb://admin:${MONGO_ROOT_PASSWORD}@localhost:27017/ibpipeline?authSource=admin"
+        },
+        {
+          "name": "SPRING_DATA_MONGODB_DATABASE",
+          "value": "ibpipeline"
+        },
+        {
+          "name": "SPRING_KAFKA_BOOTSTRAP_SERVERS",
+          "value": "localhost:9092"
+        },
+        {
+          "name": "SPRING_KAFKA_CONSUMER_GROUP_ID",
+          "value": "ibpipeline-group"
+        },
+        {
+          "name": "SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET",
+          "value": "earliest"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:ibpipeline/jwt/secret"
+        },
+        {
+          "name": "MONGO_ROOT_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:ibpipeline/mongodb/password"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ibpipeline-backend",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "backend"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    },
+    {
+      "name": "frontend",
+      "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ibpipeline-frontend:latest",
+      "cpu": 256,
+      "memory": 512,
+      "essential": true,
+      "dependsOn": [
+        {
+          "containerName": "backend",
+          "condition": "HEALTHY"
+        }
+      ],
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "API_URL",
+          "value": "http://localhost:8080/api"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ibpipeline-frontend",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "frontend"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "mongodb-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "${EFS_ID}",
+        "rootDirectory": "/mongodb",
+        "transitEncryption": "ENABLED"
+      }
+    },
+    {
+      "name": "zookeeper-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "${EFS_ID}",
+        "rootDirectory": "/zookeeper",
+        "transitEncryption": "ENABLED"
+      }
+    },
+    {
+      "name": "kafka-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "${EFS_ID}",
+        "rootDirectory": "/kafka",
+        "transitEncryption": "ENABLED"
+      }
+    }
+  ]
+}

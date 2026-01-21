@@ -10,7 +10,7 @@ export class UserService {
   constructor(private http: HttpClient) {}
 
   getAll() {
-    return this.http.get<any[]>(`${this.base}/users`);
+    return this.http.get<any[]>(`${this.base}/admin/users`);
   }
 
   create(payload: any) {

@@ -1,0 +1,177 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_BACKEND_REPO: ibpipeline-backend
+  ECR_FRONTEND_REPO: ibpipeline-frontend
+  ECS_CLUSTER: ibpipeline-cluster
+  BACKEND_SERVICE: ibpipeline-backend-service
+  FRONTEND_SERVICE: ibpipeline-frontend-service
+
+jobs:
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Run Backend Tests
+        working-directory: ./IBPipeline
+        run: mvn clean test
+      
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: IBPipeline/target/surefire-reports/**/*.xml
+
+  test-frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: npm ci --legacy-peer-deps
+      
+      - name: Run Frontend Tests
+        working-directory: ./frontend
+        run: npm run test -- --watch=false --code-coverage --browsers=ChromeHeadless
+      
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./frontend/coverage
+          flags: frontend
+
+  build-and-push:
+    name: Build and Push Docker Images
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      backend-image: ${{ steps.build-backend.outputs.image }}
+      frontend-image: ${{ steps.build-frontend.outputs.image }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Build Backend Image
+        id: build-backend
+        working-directory: ./IBPipeline
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
+          echo "image=$ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Build Frontend Image
+        id: build-frontend
+        working-directory: ./frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
+          echo "image=$ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Scan Backend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build-backend.outputs.image }}
+          format: 'sarif'
+          output: 'trivy-backend-results.sarif'
+      
+      - name: Scan Frontend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build-frontend.outputs.image }}
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+      
+      - name: Upload Trivy Results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: '.'
+
+  deploy:
+    name: Deploy to AWS ECS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Deploy Backend to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.BACKEND_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+      
+      - name: Deploy Frontend to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.FRONTEND_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+      
+      - name: Wait for Services to Stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.BACKEND_SERVICE }} ${{ env.FRONTEND_SERVICE }} \
+            --region ${{ env.AWS_REGION }}
+      
+      - name: Deployment Status
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "Backend: ${{ needs.build-and-push.outputs.backend-image }}"
+          echo "Frontend: ${{ needs.build-and-push.outputs.frontend-image }}"

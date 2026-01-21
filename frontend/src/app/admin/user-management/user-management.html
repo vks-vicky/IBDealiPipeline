@@ -1,42 +1,209 @@
-<h2>User Management</h2>
-
-<button mat-raised-button color="primary" routerLink="/admin/new">
-  Create User
-</button>
-
-<table mat-table [dataSource]="users" class="mat-elevation-z2">
-
-  <ng-container matColumnDef="username">
-    <th mat-header-cell *matHeaderCellDef>Username</th>
-    <td mat-cell *matCellDef="let u">{{ u.username }}</td>
-  </ng-container>
-
-  <ng-container matColumnDef="email">
-    <th mat-header-cell *matHeaderCellDef>Email</th>
-    <td mat-cell *matCellDef="let u">{{ u.email }}</td>
-  </ng-container>
-
-  <ng-container matColumnDef="role">
-    <th mat-header-cell *matHeaderCellDef>Role</th>
-    <td mat-cell *matCellDef="let u">{{ u.role }}</td>
-  </ng-container>
-
-  <ng-container matColumnDef="active">
-    <th mat-header-cell *matHeaderCellDef>Status</th>
-    <td mat-cell *matCellDef="let u">
-      {{ u.active ? 'Active' : 'Inactive' }}
-    </td>
-  </ng-container>
-
-  <ng-container matColumnDef="actions">
-    <th mat-header-cell *matHeaderCellDef>Actions</th>
-    <td mat-cell *matCellDef="let u">
-      <button mat-button (click)="toggle(u)">
-        {{ u.active ? 'Deactivate' : 'Activate' }}
+<div class="user-management-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-content">
+      <div class="title-section">
+        <h1 class="page-title">Admin User Management</h1>
+        <p class="page-subtitle">Manage access permissions, roles, and account status for the Deal Pipeline Portal</p>
+      </div>
+      <button 
+        mat-raised-button 
+        color="primary" 
+        (click)="openCreateUserDialog()"
+        class="create-button"
+      >
+        <mat-icon>add</mat-icon>
+        Add New User
       </button>
-    </td>
-  </ng-container>
+    </div>
+  </div>
 
-  <tr mat-header-row *matHeaderRowDef="columns"></tr>
-  <tr mat-row *matRowDef="let row; columns: columns;"></tr>
-</table>
+  <!-- Search and Filter Section -->
+  <div class="filters-section">
+    <div class="search-and-dropdown">
+      <mat-form-field appearance="outline" class="search-field">
+        <input 
+          matInput 
+          [(ngModel)]="searchTerm" 
+          (ngModelChange)="filterUsers()"
+          placeholder="Search by name, email, or employee ID..."
+        >
+        <mat-icon matPrefix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="role-filter">
+        <mat-select [(ngModel)]="selectedRole" (ngModelChange)="filterUsers()" placeholder="All Roles">
+          <mat-option value="ALL">All Roles</mat-option>
+          <mat-option value="ADMIN">Admin</mat-option>
+          <mat-option value="USER">User</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>filter_list</mat-icon>
+      </mat-form-field>
+    </div>
+
+    <div class="quick-filters">
+      <span class="filter-label">QUICK FILTERS:</span>
+      <button 
+        mat-stroked-button 
+        class="filter-chip"
+        [class.active]="selectedStatus === 'ACTIVE'"
+        (click)="selectedStatus = selectedStatus === 'ACTIVE' ? 'ALL' : 'ACTIVE'; filterUsers()"
+      >
+        Status: Active
+        <mat-icon *ngIf="selectedStatus === 'ACTIVE'">close</mat-icon>
+      </button>
+      <button 
+        mat-stroked-button 
+        class="filter-chip"
+        [class.active]="selectedRole === 'ADMIN'"
+        (click)="selectedRole = selectedRole === 'ADMIN' ? 'ALL' : 'ADMIN'; filterUsers()"
+      >
+        Role: Admin
+        <mat-icon *ngIf="selectedRole === 'ADMIN'">close</mat-icon>
+      </button>
+      <button 
+        mat-button 
+        class="clear-all"
+        (click)="clearFilters()"
+        *ngIf="searchTerm || selectedRole !== 'ALL' || selectedStatus !== 'ALL'"
+      >
+        Clear All
+      </button>
+    </div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="table-container">
+    <table mat-table [dataSource]="paginatedUsers" class="users-table">
+
+      <ng-container matColumnDef="username">
+        <th mat-header-cell *matHeaderCellDef>USER</th>
+        <td mat-cell *matCellDef="let u">
+          <div class="user-cell">
+            <div class="avatar">{{ u.username?.charAt(0).toUpperCase() || 'U' }}</div>
+            <div class="user-info">
+              <span class="username-text">{{ u.username }}</span>
+              <span class="email-text">{{ u.email }}</span>
+            </div>
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="email">
+        <th mat-header-cell *matHeaderCellDef style="display: none;"></th>
+        <td mat-cell *matCellDef="let u" style="display: none;"></td>
+      </ng-container>
+
+      <ng-container matColumnDef="role">
+        <th mat-header-cell *matHeaderCellDef>ROLE</th>
+        <td mat-cell *matCellDef="let u">
+          <span class="role-badge" [class.admin]="u.role === 'ADMIN'" [class.user]="u.role === 'USER'">
+            {{ u.role }}
+          </span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="active">
+        <th mat-header-cell *matHeaderCellDef>STATUS</th>
+        <td mat-cell *matCellDef="let u">
+          <span class="status-badge" [class.active]="u.active" [class.inactive]="!u.active">
+            <mat-icon>{{ u.active ? 'check_circle' : 'cancel' }}</mat-icon>
+            {{ u.active ? 'Active' : 'Inactive' }}
+          </span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>ACTIONS</th>
+        <td mat-cell *matCellDef="let u">
+          <div class="actions-cell">
+            <mat-slide-toggle 
+              [checked]="u.active" 
+              [class.toggle-active]="u.active"
+              [class.toggle-inactive]="!u.active"
+              (change)="toggle(u)"
+              color="primary"
+            ></mat-slide-toggle>
+            <button 
+              mat-icon-button 
+              [matMenuTriggerFor]="menu"
+              class="action-button"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #menu="matMenu">
+              <button mat-menu-item (click)="toggle(u)">
+                <mat-icon>{{ u.active ? 'block' : 'check_circle' }}</mat-icon>
+                <span>{{ u.active ? 'Deactivate' : 'Activate' }}</span>
+              </button>
+              <button mat-menu-item disabled>
+                <mat-icon>edit</mat-icon>
+                <span>Edit User</span>
+              </button>
+              <button mat-menu-item disabled>
+                <mat-icon>delete</mat-icon>
+                <span>Delete User</span>
+              </button>
+            </mat-menu>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns;" class="table-row" [attr.data-user-id]="row.id"></tr>
+    </table>
+
+    <div class="no-data" *ngIf="paginatedUsers.length === 0">
+      <mat-icon>search_off</mat-icon>
+      <p>No users found</p>
+      <span>Try adjusting your search criteria</span>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-section" *ngIf="totalUsers > 0">
+    <div class="pagination-info">
+      <div class="results-text">
+        Showing <strong>{{ startIndex }}</strong> to <strong>{{ endIndex }}</strong> of <strong>{{ totalUsers }}</strong> results
+      </div>
+      <div class="page-size-selector">
+        <span class="page-size-label">Rows per page:</span>
+        <mat-form-field appearance="outline" class="page-size-field">
+          <mat-select [(ngModel)]="pageSize" (ngModelChange)="filterUsers()">
+            <mat-option [value]="5">5</mat-option>
+            <mat-option [value]="10">10</mat-option>
+            <mat-option [value]="20">20</mat-option>
+            <mat-option [value]="50">50</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </div>
+    <div class="pagination-controls">
+      <button 
+        mat-button 
+        (click)="previousPage()" 
+        [disabled]="currentPage === 1"
+        class="page-button"
+      >
+        Previous
+      </button>
+      <button 
+        mat-button 
+        *ngFor="let page of [].constructor(totalPages); let i = index"
+        (click)="goToPage(i + 1)"
+        [class.active]="currentPage === i + 1"
+        class="page-number"
+      >
+        {{ i + 1 }}
+      </button>
+      <button 
+        mat-button 
+        (click)="nextPage()" 
+        [disabled]="currentPage === totalPages"
+        class="page-button"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+</div>

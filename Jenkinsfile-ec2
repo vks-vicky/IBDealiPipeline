@@ -1,0 +1,321 @@
+pipeline {
+    agent any
+    
+    environment {
+        // EC2 Configuration
+        EC2_USER = 'ec2-user'
+        EC2_HOST = credentials('ec2-host')  // Store EC2 public IP in Jenkins credentials
+        EC2_KEY = credentials('ec2-ssh-key')  // Store SSH private key in Jenkins
+        APP_DIR = '/home/ec2-user/ibpipeline'
+        
+        // Docker Configuration
+        IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT?.take(7) ?: 'latest'}"
+        
+        // GitHub Configuration
+        GITHUB_REPO = 'your-github-username/ibpipeline'
+    }
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+    }
+    
+    triggers {
+        githubPush()  // Trigger on GitHub push
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    echo "Building commit: ${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Validate') {
+            parallel {
+                stage('Validate Backend') {
+                    steps {
+                        dir('IBPipeline') {
+                            sh '''
+                                echo "Validating Backend POM..."
+                                mvn validate
+                            '''
+                        }
+                    }
+                }
+                stage('Validate Frontend') {
+                    steps {
+                        dir('frontend') {
+                            sh '''
+                                echo "Validating Frontend package.json..."
+                                npm --version
+                                node --version
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Test') {
+            parallel {
+                stage('Backend Tests') {
+                    steps {
+                        dir('IBPipeline') {
+                            sh '''
+                                echo "Running Backend Tests..."
+                                mvn clean test
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            junit 'IBPipeline/target/surefire-reports/**/*.xml'
+                        }
+                    }
+                }
+                stage('Frontend Tests') {
+                    steps {
+                        dir('frontend') {
+                            sh '''
+                                echo "Running Frontend Tests..."
+                                npm ci --legacy-peer-deps
+                                npm run test -- --watch=false --browsers=ChromeHeadless --coverage
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishHTML([
+                                allowMissing: false,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'frontend/coverage/frontend',
+                                reportFiles: 'index.html',
+                                reportName: 'Frontend Coverage Report'
+                            ])
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Images Locally') {
+            parallel {
+                stage('Build Backend Image') {
+                    steps {
+                        dir('IBPipeline') {
+                            sh """
+                                echo "Building Backend Docker Image..."
+                                docker build -t ibpipeline-backend:${IMAGE_TAG} .
+                                docker tag ibpipeline-backend:${IMAGE_TAG} ibpipeline-backend:latest
+                            """
+                        }
+                    }
+                }
+                stage('Build Frontend Image') {
+                    steps {
+                        dir('frontend') {
+                            sh """
+                                echo "Building Frontend Docker Image..."
+                                docker build -t ibpipeline-frontend:${IMAGE_TAG} .
+                                docker tag ibpipeline-frontend:${IMAGE_TAG} ibpipeline-frontend:latest
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Security Scan') {
+            parallel {
+                stage('Scan Backend Image') {
+                    steps {
+                        script {
+                            sh """
+                                echo "Scanning Backend Image for vulnerabilities..."
+                                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                                    aquasec/trivy:latest image ibpipeline-backend:${IMAGE_TAG} || true
+                            """
+                        }
+                    }
+                }
+                stage('Scan Frontend Image') {
+                    steps {
+                        script {
+                            sh """
+                                echo "Scanning Frontend Image for vulnerabilities..."
+                                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                                    aquasec/trivy:latest image ibpipeline-frontend:${IMAGE_TAG} || true
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to EC2') {
+            steps {
+                script {
+                    echo "Deploying to EC2 instance: ${EC2_HOST}"
+                    
+                    // Create deployment directory structure
+                    sh """
+                        # Setup SSH key
+                        mkdir -p ~/.ssh
+                        cat \${EC2_KEY} > ~/.ssh/deploy_key
+                        chmod 600 ~/.ssh/deploy_key
+                        
+                        # Add EC2 host to known_hosts
+                        ssh-keyscan -H \${EC2_HOST} >> ~/.ssh/known_hosts || true
+                    """
+                    
+                    // Stop existing containers
+                    sh """
+                        echo "Stopping existing containers on EC2..."
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} \
+                            "cd ${APP_DIR} && docker-compose down || true"
+                    """
+                    
+                    // Copy project files to EC2
+                    sh """
+                        echo "Copying project files to EC2..."
+                        
+                        # Copy docker-compose.yml
+                        scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            docker-compose.yml \${EC2_USER}@\${EC2_HOST}:${APP_DIR}/
+                        
+                        # Copy backend
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} "mkdir -p ${APP_DIR}/IBPipeline"
+                        scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+                            IBPipeline/* \${EC2_USER}@\${EC2_HOST}:${APP_DIR}/IBPipeline/
+                        
+                        # Copy frontend
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} "mkdir -p ${APP_DIR}/frontend"
+                        scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+                            frontend/* \${EC2_USER}@\${EC2_HOST}:${APP_DIR}/frontend/
+                        
+                        # Copy .env if exists
+                        if [ -f .env ]; then
+                            scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                                .env \${EC2_USER}@\${EC2_HOST}:${APP_DIR}/
+                        fi
+                    """
+                    
+                    // Build and start containers on EC2
+                    sh """
+                        echo "Building and starting containers on EC2..."
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} \
+                            "cd ${APP_DIR} && docker-compose up -d --build"
+                    """
+                    
+                    // Wait for services to be healthy
+                    sh """
+                        echo "Waiting for services to be healthy..."
+                        sleep 60
+                    """
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                script {
+                    echo "Performing health checks..."
+                    
+                    // Check container status
+                    sh """
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} \
+                            "cd ${APP_DIR} && docker-compose ps"
+                    """
+                    
+                    // Test backend health endpoint
+                    sh """
+                        echo "Testing Backend health endpoint..."
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} \
+                            "curl -f http://localhost:8080/api/auth/health || curl -f http://localhost:8080/actuator/health || true"
+                    """
+                    
+                    // Test frontend
+                    sh """
+                        echo "Testing Frontend..."
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} \
+                            "curl -f http://localhost:80 > /dev/null || true"
+                    """
+                    
+                    echo "Health checks completed!"
+                }
+            }
+        }
+        
+        stage('Show Logs') {
+            steps {
+                script {
+                    echo "Fetching recent logs from EC2..."
+                    sh """
+                        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                            \${EC2_USER}@\${EC2_HOST} \
+                            "cd ${APP_DIR} && docker-compose logs --tail=50"
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo """
+            ========================================
+            Deployment Successful!
+            ========================================
+            Build: ${env.BUILD_NUMBER}
+            Commit: ${env.GIT_COMMIT_SHORT}
+            
+            Application URLs:
+            - Frontend: http://${EC2_HOST}
+            - Backend: http://${EC2_HOST}:8080
+            - Kafka UI: http://${EC2_HOST}:8081
+            - Jenkins: http://${EC2_HOST}:8082
+            ========================================
+            """
+        }
+        failure {
+            echo "Deployment failed! Check logs for details."
+            script {
+                // Optionally get error logs
+                sh """
+                    ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                        \${EC2_USER}@\${EC2_HOST} \
+                        "cd ${APP_DIR} && docker-compose logs --tail=100" || true
+                """
+            }
+        }
+        always {
+            // Cleanup
+            sh """
+                rm -f ~/.ssh/deploy_key
+            """
+            cleanWs(
+                deleteDirs: true,
+                patterns: [
+                    [pattern: '.git', type: 'EXCLUDE']
+                ]
+            )
+        }
+    }
+}

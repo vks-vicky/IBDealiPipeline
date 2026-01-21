@@ -1,44 +1,290 @@
-<h2>Deal Pipeline</h2>
+<div class="deal-list-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-content">
+      <div class="title-section">
+        <h1 class="page-title">Global Deal Pipeline</h1>
+        <p class="page-subtitle">Tracking active mandates across M&A, Capital Markets, and Advisory</p>
+      </div>
+      <div class="header-actions">
+        <div class="view-toggle">
+          <button 
+            mat-icon-button 
+            [class.active]="viewMode === 'table'"
+            (click)="toggleView('table')"
+            matTooltip="Table View"
+          >
+            <mat-icon>view_list</mat-icon>
+          </button>
+          <button 
+            mat-icon-button 
+            [class.active]="viewMode === 'kanban'"
+            (click)="toggleView('kanban')"
+            matTooltip="Board View"
+          >
+            <mat-icon>view_kanban</mat-icon>
+          </button>
+        </div>
+        <button 
+          mat-raised-button 
+          color="primary" 
+          (click)="openCreateDealDialog()"
+          class="create-button"
+        >
+          <mat-icon>add</mat-icon>
+          Create New Deal
+        </button>
+      </div>
+    </div>
+  </div>
 
-<button mat-raised-button color="primary" routerLink="/deals/new">Create Deal</button>
+  <!-- Table View -->
+  <div *ngIf="viewMode === 'table'">
+    <!-- Search and Filter Section -->
+    <div class="filters-section">
+      <div class="search-and-filters">
+        <mat-form-field appearance="outline" class="search-field">
+          <input 
+            matInput 
+            [(ngModel)]="searchTerm" 
+            (ngModelChange)="filterDeals()"
+            placeholder="Search clients, deals, or sectors..."
+          >
+          <mat-icon matPrefix>search</mat-icon>
+        </mat-form-field>
 
-<table mat-table [dataSource]="deals" class="mat-elevation-z2">
-  <ng-container matColumnDef="clientName">
-    <th mat-header-cell *matHeaderCellDef>Client</th>
-    <td mat-cell *matCellDef="let d">
-      <a [routerLink]="['/deals', d.id]">{{ d.clientName }}</a>
-    </td>
-  </ng-container>
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-select [(ngModel)]="selectedSector" (ngModelChange)="filterDeals()" placeholder="All Sectors">
+            <mat-option value="ALL">All Sectors</mat-option>
+            <mat-option value="TECH">Tech</mat-option>
+            <mat-option value="ENERGY">Energy</mat-option>
+            <mat-option value="CONSUMER">Consumer</mat-option>
+            <mat-option value="RETAIL">Retail</mat-option>
+            <mat-option value="BIOTECH">Biotech</mat-option>
+          </mat-select>
+          <mat-icon matPrefix>business</mat-icon>
+        </mat-form-field>
 
-  <ng-container matColumnDef="sector">
-    <th mat-header-cell *matHeaderCellDef>Sector</th>
-    <td mat-cell *matCellDef="let d">{{ d.sector }}</td>
-  </ng-container>
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-select [(ngModel)]="selectedType" (ngModelChange)="filterDeals()" placeholder="All Types">
+            <mat-option value="ALL">All Types</mat-option>
+            <mat-option value="M&A">M&A</mat-option>
+            <mat-option value="IPO">IPO</mat-option>
+            <mat-option value="DEBT">Debt</mat-option>
+            <mat-option value="ADVISORY">Advisory</mat-option>
+          </mat-select>
+          <mat-icon matPrefix>category</mat-icon>
+        </mat-form-field>
 
-  <ng-container matColumnDef="dealType">
-    <th mat-header-cell *matHeaderCellDef>Type</th>
-    <td mat-cell *matCellDef="let d">{{ d.dealType }}</td>
-  </ng-container>
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-select [(ngModel)]="selectedStage" (ngModelChange)="filterDeals()" placeholder="All Stages">
+            <mat-option value="ALL">All Stages</mat-option>
+            <mat-option value="Prospect">Prospect</mat-option>
+            <mat-option value="UnderEvaluation">Under Evaluation</mat-option>
+            <mat-option value="TermSheetSubmitted">Term Sheet</mat-option>
+            <mat-option value="Closed">Closed</mat-option>
+            <mat-option value="Lost">Lost</mat-option>
+          </mat-select>
+          <mat-icon matPrefix>timeline</mat-icon>
+        </mat-form-field>
 
-  <!-- ADMIN ONLY -->
-  <ng-container matColumnDef="dealValue">
-    <th mat-header-cell *matHeaderCellDef>Value</th>
-    <td mat-cell *matCellDef="let d">{{ d.dealValue | number }}</td>
-  </ng-container>
+        <button 
+          mat-stroked-button 
+          class="clear-filters"
+          (click)="clearFilters()"
+          *ngIf="searchTerm || selectedSector !== 'ALL' || selectedStage !== 'ALL' || selectedType !== 'ALL'"
+        >
+          <mat-icon>clear</mat-icon>
+          Clear
+        </button>
+      </div>
+    </div>
 
-  <ng-container matColumnDef="stage">
-    <th mat-header-cell *matHeaderCellDef>Stage</th>
-    <td mat-cell *matCellDef="let d">{{ d.currentStage }}</td>
-  </ng-container>
+    <!-- Deals Table -->
+    <div class="table-container">
+      <table mat-table [dataSource]="paginatedDeals" class="deals-table">
 
-  <!-- ADMIN ONLY -->
-  <ng-container matColumnDef="actions">
-    <th mat-header-cell *matHeaderCellDef>Actions</th>
-    <td mat-cell *matCellDef="let d">
-      <button mat-button color="warn" (click)="deleteDeal(d.id)">Delete</button>
-    </td>
-  </ng-container>
+        <ng-container matColumnDef="client">
+          <th mat-header-cell *matHeaderCellDef>CLIENT / DEAL</th>
+          <td mat-cell *matCellDef="let deal">
+            <div class="client-cell">
+              <div class="client-avatar">{{ deal.clientName?.charAt(0).toUpperCase() || 'C' }}</div>
+              <div class="client-info">
+                <a [routerLink]="['/deals', deal.id]" class="client-name">{{ deal.clientName }}</a>
+                <span class="deal-summary">{{ deal.summary }}</span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
 
-  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-</table>
+        <ng-container matColumnDef="sector">
+          <th mat-header-cell *matHeaderCellDef>SECTOR</th>
+          <td mat-cell *matCellDef="let deal">
+            <span class="sector-badge" [attr.data-sector]="deal.sector">
+              {{ deal.sector }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>TYPE</th>
+          <td mat-cell *matCellDef="let deal">
+            <span class="type-badge">{{ deal.dealType }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="value">
+          <th mat-header-cell *matHeaderCellDef>VALUE</th>
+          <td mat-cell *matCellDef="let deal">
+            <span class="deal-value">{{ formatCurrency(deal.dealValue) }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="stage">
+          <th mat-header-cell *matHeaderCellDef>STAGE</th>
+          <td mat-cell *matCellDef="let deal">
+            <span class="stage-badge" [attr.data-stage]="deal.currentStage">
+              {{ getStageLabel(deal.currentStage) }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>ACTIONS</th>
+          <td mat-cell *matCellDef="let deal">
+            <div class="actions-cell">
+              <button 
+                mat-icon-button 
+                [matMenuTriggerFor]="menu"
+                class="action-button"
+                (click)="$event.stopPropagation()"
+              >
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu">
+                <button mat-menu-item [routerLink]="['/deals', deal.id]">
+                  <mat-icon>visibility</mat-icon>
+                  <span>View Details</span>
+                </button>
+                <button mat-menu-item [routerLink]="['/deals', deal.id, 'edit']" *ngIf="isAdmin">
+                  <mat-icon>edit</mat-icon>
+                  <span>Edit Deal</span>
+                </button>
+                <button mat-menu-item (click)="deleteDeal(deal.id, $event)" *ngIf="isAdmin">
+                  <mat-icon>delete</mat-icon>
+                  <span>Delete Deal</span>
+                </button>
+              </mat-menu>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns;" class="table-row" [routerLink]="['/deals', row.id]"></tr>
+      </table>
+
+      <div class="no-data" *ngIf="paginatedDeals.length === 0">
+        <mat-icon>search_off</mat-icon>
+        <p>No deals found</p>
+        <span>Try adjusting your search criteria or create a new deal</span>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-section" *ngIf="totalDeals > 0">
+      <div class="pagination-info">
+        <div class="results-text">
+          Showing <strong>{{ startIndex }}</strong> to <strong>{{ endIndex }}</strong> of <strong>{{ totalDeals }}</strong> deals
+        </div>
+        <div class="page-size-selector">
+          <span class="page-size-label">Rows per page:</span>
+          <mat-form-field appearance="outline" class="page-size-field">
+            <mat-select [(ngModel)]="pageSize" (ngModelChange)="filterDeals()">
+              <mat-option [value]="5">5</mat-option>
+              <mat-option [value]="10">10</mat-option>
+              <mat-option [value]="20">20</mat-option>
+              <mat-option [value]="50">50</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+      <div class="pagination-controls">
+        <button 
+          mat-button 
+          (click)="previousPage()" 
+          [disabled]="currentPage === 1"
+          class="page-button"
+        >
+          Previous
+        </button>
+        <button 
+          mat-button 
+          *ngFor="let page of [].constructor(totalPages); let i = index"
+          (click)="goToPage(i + 1)"
+          [class.active]="currentPage === i + 1"
+          class="page-number"
+        >
+          {{ i + 1 }}
+        </button>
+        <button 
+          mat-button 
+          (click)="nextPage()" 
+          [disabled]="currentPage === totalPages"
+          class="page-button"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kanban Board View -->
+  <div *ngIf="viewMode === 'kanban'" class="kanban-container">
+    <div class="kanban-board">
+      <div class="kanban-column" *ngFor="let stage of stages" [attr.data-stage]="stage">
+        <div class="column-header">
+          <div class="header-content">
+            <span class="stage-name">{{ getStageLabel(stage) }}</span>
+            <span class="stage-count">{{ getStageCount(stage) }}</span>
+          </div>
+          <div class="stage-value" *ngIf="isAdmin">
+            {{ formatCurrency(getStageTotalValue(stage)) }}
+          </div>
+        </div>
+        
+        <div class="column-body">
+          <div 
+            class="deal-card" 
+            *ngFor="let deal of getDealsByStage(stage); trackBy: trackByDealId"
+            [routerLink]="['/deals', deal.id]"
+          >
+            <div class="card-header">
+              <div class="client-avatar-small">{{ (deal.clientName.charAt(0) || 'C').toUpperCase() }}</div>
+              <div class="card-title">
+                <h4>{{ deal.clientName }}</h4>
+                <span class="deal-type-tag">{{ deal.dealType }}</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="deal-summary-text">{{ deal.summary }}</p>
+              <div class="card-meta">
+                <span class="sector-tag" [attr.data-sector]="deal.sector">
+                  <mat-icon>business</mat-icon>
+                  {{ deal.sector }}
+                </span>
+                <span class="deal-value-text" *ngIf="isAdmin && deal.dealValue">
+                  {{ formatCurrency(deal.dealValue) }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-column" *ngIf="getDealsByStage(stage).length === 0">
+            <mat-icon>inbox</mat-icon>
+            <span>No deals</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

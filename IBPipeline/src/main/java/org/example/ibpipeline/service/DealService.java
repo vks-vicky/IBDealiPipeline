@@ -1,5 +1,7 @@
 package org.example.ibpipeline.service;
 
+import org.example.ibpipeline.event.DealEvent;
+import org.example.ibpipeline.event.DealEventType;
 import org.example.ibpipeline.exception.BadRequestException;
 import org.example.ibpipeline.exception.ResourceNotFoundException;
 import org.example.ibpipeline.model.Deal;
@@ -10,14 +12,17 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class DealService {
 
     private final DealRepository dealRepository;
+    private final KafkaProducerService kafkaProducerService;
 
-    public DealService(DealRepository dealRepository) {
+    public DealService(DealRepository dealRepository, KafkaProducerService kafkaProducerService) {
         this.dealRepository = dealRepository;
+        this.kafkaProducerService = kafkaProducerService;
     }
 
     // =========================
@@ -28,7 +33,21 @@ public class DealService {
         deal.setCurrentStage(DealStage.Prospect);
         deal.setCreatedAt(Instant.now());
         deal.setUpdatedAt(Instant.now());
-        return dealRepository.save(deal);
+        Deal savedDeal = dealRepository.save(deal);
+
+        // Publish Kafka event
+        DealEvent event = new DealEvent(
+                UUID.randomUUID().toString(),
+                DealEventType.DEAL_CREATED,
+                savedDeal.getId(),
+                savedDeal.getClientName(),
+                createdByUserId,
+                "Deal created with stage: " + savedDeal.getCurrentStage(),
+                Instant.now()
+        );
+        kafkaProducerService.sendDealEvent(event);
+
+        return savedDeal;
     }
 
     // =========================
@@ -58,7 +77,21 @@ public class DealService {
         deal.setDealType(dealType);
         deal.setUpdatedAt(Instant.now());
 
-        return dealRepository.save(deal);
+        Deal updatedDeal = dealRepository.save(deal);
+
+        // Publish Kafka event
+        DealEvent event = new DealEvent(
+                UUID.randomUUID().toString(),
+                DealEventType.DEAL_UPDATED,
+                updatedDeal.getId(),
+                updatedDeal.getClientName(),
+                null,
+                "Deal fields updated: summary, sector, dealType",
+                Instant.now()
+        );
+        kafkaProducerService.sendDealEvent(event);
+
+        return updatedDeal;
     }
 
     // =========================
@@ -66,9 +99,24 @@ public class DealService {
     // =========================
     public Deal updateStage(String id, DealStage stage) {
         Deal deal = getDealById(id);
+        DealStage oldStage = deal.getCurrentStage();
         deal.setCurrentStage(stage);
         deal.setUpdatedAt(Instant.now());
-        return dealRepository.save(deal);
+        Deal updatedDeal = dealRepository.save(deal);
+
+        // Publish Kafka event
+        DealEvent event = new DealEvent(
+                UUID.randomUUID().toString(),
+                DealEventType.STAGE_UPDATED,
+                updatedDeal.getId(),
+                updatedDeal.getClientName(),
+                null,
+                "Stage changed from " + oldStage + " to " + stage,
+                Instant.now()
+        );
+        kafkaProducerService.sendDealEvent(event);
+
+        return updatedDeal;
     }
 
     // =========================
@@ -89,7 +137,21 @@ public class DealService {
         deal.getNotes().add(note);
         deal.setUpdatedAt(Instant.now());
 
-        return dealRepository.save(deal);
+        Deal updatedDeal = dealRepository.save(deal);
+
+        // Publish Kafka event
+        DealEvent event = new DealEvent(
+                UUID.randomUUID().toString(),
+                DealEventType.NOTE_ADDED,
+                updatedDeal.getId(),
+                updatedDeal.getClientName(),
+                userId,
+                "Note added: " + (noteText.length() > 50 ? noteText.substring(0, 50) + "..." : noteText),
+                Instant.now()
+        );
+        kafkaProducerService.sendDealEvent(event);
+
+        return updatedDeal;
     }
 
     // =========================
@@ -101,10 +163,25 @@ public class DealService {
         }
 
         Deal deal = getDealById(id);
+        Long oldValue = deal.getDealValue();
         deal.setDealValue(value);
         deal.setUpdatedAt(Instant.now());
 
-        return dealRepository.save(deal);
+        Deal updatedDeal = dealRepository.save(deal);
+
+        // Publish Kafka event
+        DealEvent event = new DealEvent(
+                UUID.randomUUID().toString(),
+                DealEventType.VALUE_UPDATED,
+                updatedDeal.getId(),
+                updatedDeal.getClientName(),
+                null,
+                "Deal value updated from " + oldValue + " to " + value,
+                Instant.now()
+        );
+        kafkaProducerService.sendDealEvent(event);
+
+        return updatedDeal;
     }
 
     // =========================
@@ -114,6 +191,20 @@ public class DealService {
         if (!dealRepository.existsById(id)) {
             throw new ResourceNotFoundException("Deal not found");
         }
+        Deal deal = getDealById(id);
+
         dealRepository.deleteById(id);
+
+        // Publish Kafka event
+        DealEvent event = new DealEvent(
+                UUID.randomUUID().toString(),
+                DealEventType.DEAL_DELETED,
+                deal.getId(),
+                deal.getClientName(),
+                null,
+                "Deal deleted permanently",
+                Instant.now()
+        );
+        kafkaProducerService.sendDealEvent(event);
     }
 }

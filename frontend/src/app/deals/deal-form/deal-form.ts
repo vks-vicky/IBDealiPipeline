@@ -1,10 +1,12 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Inject, Optional } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatCardModule } from '@angular/material/card';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatSelectModule } from '@angular/material/select';
+import { MatIconModule } from '@angular/material/icon';
 import { DealService } from '../../core/services/deal';
 import { AuthService } from '../../core/services/auth';
 
@@ -17,25 +19,30 @@ import { AuthService } from '../../core/services/auth';
     MatCardModule,
     MatInputModule,
     MatButtonModule,
-    RouterModule
+    MatSelectModule,
+    MatIconModule,
+    MatDialogModule
   ],
-  templateUrl: './deal-form.html'
+  templateUrl: './deal-form.html',
+  styleUrls: ['./deal-form.scss']
 })
 
 export class DealForm implements OnInit {
 
   isEdit = false;
   isAdmin = false;
-  dealId?: string;
 
   form!: ReturnType<FormBuilder['group']>;
 
+  sectors = ['TECH', 'ENERGY', 'CONSUMER', 'RETAIL', 'BIOTECH'];
+  dealTypes = ['M&A', 'IPO', 'DEBT', 'ADVISORY'];
+
   constructor(
     private fb: FormBuilder,
-    private route: ActivatedRoute,
-    private router: Router,
     private deals: DealService,
-    private auth: AuthService
+    private auth: AuthService,
+    @Optional() public dialogRef: MatDialogRef<DealForm>,
+    @Optional() @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
   ngOnInit() {
@@ -45,7 +52,7 @@ export class DealForm implements OnInit {
       clientName: ['', Validators.required],
       sector: ['', Validators.required],
       dealType: ['', Validators.required],
-      summary: [''],
+      summary: ['', Validators.required],
       dealValue: [null]
     });
 
@@ -53,13 +60,9 @@ export class DealForm implements OnInit {
       this.form.removeControl('dealValue');
     }
 
-    this.dealId = this.route.snapshot.paramMap.get('id') || undefined;
-    this.isEdit = !!this.dealId;
-
-    if (this.isEdit && this.dealId) {
-      this.deals.getDeal(this.dealId).subscribe(d => {
-        this.form.patchValue(d);
-      });
+    if (this.data?.deal) {
+      this.isEdit = true;
+      this.form.patchValue(this.data.deal);
     }
   }
 
@@ -68,14 +71,30 @@ export class DealForm implements OnInit {
 
     const payload = this.form.value;
 
-    if (this.isEdit && this.dealId) {
-      this.deals.updateBasic(this.dealId, payload).subscribe(() => {
-        this.router.navigate(['/deals']);
+    if (this.isEdit && this.data?.deal?.id) {
+      this.deals.updateBasic(this.data.deal.id, payload).subscribe({
+        next: () => {
+          if (this.dialogRef) {
+            this.dialogRef.close(true);
+          }
+        },
+        error: (err) => console.error('Error updating deal:', err)
       });
     } else {
-      this.deals.createDeal(payload).subscribe(() => {
-        this.router.navigate(['/deals']);
+      this.deals.createDeal(payload).subscribe({
+        next: () => {
+          if (this.dialogRef) {
+            this.dialogRef.close(true);
+          }
+        },
+        error: (err) => console.error('Error creating deal:', err)
       });
+    }
+  }
+
+  cancel() {
+    if (this.dialogRef) {
+      this.dialogRef.close(false);
     }
   }
 }

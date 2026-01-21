@@ -1,41 +1,238 @@
-<mat-card *ngIf="deal">
-
-  <h2>{{ deal.clientName }}</h2>
-  <p>{{ deal.summary }}</p>
-
-  <p><strong>Sector:</strong> {{ deal.sector }}</p>
-  <p><strong>Type:</strong> {{ deal.dealType }}</p>
-
-  <p *ngIf="isAdmin">
-    <strong>Value:</strong> {{ deal.dealValue | number }}
-  </p>
-
-  <div>
-    <strong>Stage:</strong>
-    <mat-select [value]="deal.currentStage"
-                (selectionChange)="updateStage($event.value)">
-      <mat-option *ngFor="let s of stages" [value]="s">
-        {{ s }}
-      </mat-option>
-    </mat-select>
+<div class="deal-detail-container" *ngIf="deal">
+  <!-- Header -->
+  <div class="detail-header">
+    <button mat-icon-button (click)="goBack()" class="back-button">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <div class="header-content">
+      <div class="title-section">
+        <h1 class="deal-title">{{ deal.clientName }} - {{ deal.dealType }}</h1>
+        <div class="deal-meta">
+          <span class="sector-tag" [attr.data-sector]="deal.sector">
+            <mat-icon>business</mat-icon>
+            {{ deal.sector }}
+          </span>
+          <span class="deal-type">{{ deal.dealType }}</span>
+          <span class="stage-badge" [attr.data-stage]="deal.currentStage">
+            {{ getStageLabel(deal.currentStage) }}
+          </span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button 
+          mat-raised-button 
+          color="primary" 
+          (click)="edit()"
+          *ngIf="isAdmin"
+        >
+          <mat-icon>edit</mat-icon>
+          Edit Deal
+        </button>
+      </div>
+    </div>
   </div>
 
-  <br>
+  <!-- Main Content -->
+  <div class="detail-body">
+    <!-- Left Column - Deal Information -->
+    <div class="left-column">
+      <!-- Deal Overview Card -->
+      <mat-card class="info-card">
+        <div class="card-header">
+          <h3>Deal Information</h3>
+        </div>
+        <mat-card-content>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Client</label>
+              <div class="value">{{ deal.clientName }}</div>
+            </div>
+            <div class="info-item">
+              <label>Sector</label>
+              <div class="value sector-value" [attr.data-sector]="deal.sector">
+                {{ deal.sector }}
+              </div>
+            </div>
+            <div class="info-item">
+              <label>Deal Type</label>
+              <div class="value">{{ deal.dealType }}</div>
+            </div>
+            <div class="info-item" *ngIf="isAdmin && deal.dealValue">
+              <label>Deal Value</label>
+              <div class="value deal-value">{{ formatCurrency(deal.dealValue) }}</div>
+            </div>
+            <div class="info-item">
+              <label>Current Stage</label>
+              <div class="value">
+                <mat-form-field appearance="outline" class="stage-select" *ngIf="isAdmin">
+                  <mat-select 
+                    [value]="deal.currentStage" 
+                    (selectionChange)="updateStage($event.value)"
+                  >
+                    <mat-option *ngFor="let stage of stages" [value]="stage">
+                      {{ getStageLabel(stage) }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <span *ngIf="!isAdmin" class="stage-badge" [attr.data-stage]="deal.currentStage">
+                  {{ getStageLabel(deal.currentStage) }}
+                </span>
+              </div>
+            </div>
+            <div class="info-item full-width">
+              <label>Summary</label>
+              <div class="value summary">{{ deal.summary || 'No summary provided' }}</div>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
 
-  <button mat-button (click)="edit()">Edit</button>
+      <!-- Executive Summary Card -->
+      <mat-card class="info-card">
+        <div class="card-header">
+          <h3>Executive Summary</h3>
+        </div>
+        <mat-card-content>
+          <p class="executive-text">
+            {{ deal.summary || 'Strategic transaction currently under evaluation.' }}
+          </p>
+        </mat-card-content>
+      </mat-card>
+    </div>
 
-  <hr>
+    <!-- Right Column - Activity & Notes -->
+    <div class="right-column">
+      <!-- Deal Stage Timeline -->
+      <mat-card class="info-card">
+        <div class="card-header">
+          <h3>Deal Stage</h3>
+        </div>
+        <mat-card-content>
+          <div class="stage-timeline">
+            <div 
+              class="timeline-item"
+              *ngFor="let stage of stages"
+              [class.active]="stage === deal.currentStage"
+              [class.completed]="stages.indexOf(stage) < stages.indexOf(deal.currentStage)"
+            >
+              <div class="timeline-marker">
+                <mat-icon *ngIf="stages.indexOf(stage) < stages.indexOf(deal.currentStage)">
+                  check_circle
+                </mat-icon>
+                <mat-icon *ngIf="stage === deal.currentStage">
+                  radio_button_checked
+                </mat-icon>
+                <mat-icon *ngIf="stages.indexOf(stage) > stages.indexOf(deal.currentStage)">
+                  radio_button_unchecked
+                </mat-icon>
+              </div>
+              <div class="timeline-content">
+                <div class="stage-name">{{ getStageLabel(stage) }}</div>
+                <div class="stage-date" *ngIf="stage === deal.currentStage">
+                  Current Stage
+                </div>
+              </div>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
 
-  <h3>Notes</h3>
+      <!-- Activity & Notes Card -->
+      <mat-card class="info-card">
+        <div class="card-header">
+          <h3>Activity & Notes</h3>
+          <span class="note-count">{{ deal.notes.length || 0 }}</span>
+        </div>
+        <mat-card-content>
+          <!-- Add Note Form -->
+          <div class="add-note-section">
+            <mat-form-field appearance="outline" class="note-input">
+              <mat-label>Add a note or call log...</mat-label>
+              <textarea 
+                matInput 
+                [(ngModel)]="newNote"
+                rows="3"
+                placeholder="Type your note here..."
+              ></textarea>
+            </mat-form-field>
+            <button 
+              mat-raised-button 
+              color="primary" 
+              (click)="addNote()"
+              [disabled]="!newNote.trim()"
+              class="post-note-button"
+            >
+              <mat-icon>send</mat-icon>
+              Post Note
+            </button>
+          </div>
 
-  <div *ngFor="let n of deal.notes">
-    <p>{{ n.note }}</p>
-    <small>{{ n.timestamp | date:'short' }}</small>
-    <hr>
+          <mat-divider></mat-divider>
+
+          <!-- Notes List -->
+          <div class="notes-list" *ngIf="deal.notes && deal.notes.length > 0">
+            <div class="note-item" *ngFor="let note of deal.notes">
+              <div class="note-header">
+                <div class="note-avatar">
+                  <mat-icon>person</mat-icon>
+                </div>
+                <div class="note-meta">
+                  <span class="note-author">{{ note.userId }}</span>
+                  <span class="note-timestamp">{{ formatDate(note.timestamp) }}</span>
+                </div>
+              </div>
+              <div class="note-content">
+                {{ note.note }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div class="empty-notes" *ngIf="!deal.notes || deal.notes.length === 0">
+            <mat-icon>comment</mat-icon>
+            <p>No notes or activities yet</p>
+            <span>Add your first note to start tracking this deal</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Deal Metadata Card -->
+      <mat-card class="info-card">
+        <div class="card-header">
+          <h3>Deal Metadata</h3>
+        </div>
+        <mat-card-content>
+          <div class="metadata-list">
+            <div class="metadata-item">
+              <mat-icon>calendar_today</mat-icon>
+              <div class="metadata-content">
+                <label>Created</label>
+                <span>{{ formatDate(deal.createdAt) }}</span>
+              </div>
+            </div>
+            <div class="metadata-item">
+              <mat-icon>update</mat-icon>
+              <div class="metadata-content">
+                <label>Last Updated</label>
+                <span>{{ formatDate(deal.updatedAt) }}</span>
+              </div>
+            </div>
+            <div class="metadata-item">
+              <mat-icon>label</mat-icon>
+              <div class="metadata-content">
+                <label>Deal ID</label>
+                <span class="deal-id">{{ deal.id }}</span>
+              </div>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
   </div>
+</div>
 
-  <textarea [(ngModel)]="newNote" rows="3"></textarea>
-  <br>
-  <button mat-raised-button (click)="addNote()">Add Note</button>
-
-</mat-card>
+<!-- Loading State -->
+<div class="loading-state" *ngIf="!deal">
+  <mat-icon>hourglass_empty</mat-icon>
+  <p>Loading deal details...</p>
+</div>

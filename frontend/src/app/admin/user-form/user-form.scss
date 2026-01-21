@@ -1,0 +1,155 @@
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 0;
+  
+  h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+  }
+
+  .close-button {
+    mat-icon {
+      color: #6b7280;
+    }
+
+    &:hover mat-icon {
+      color: #1f2937;
+    }
+  }
+}
+
+.dialog-content {
+  padding: 24px !important;
+  min-width: 500px;
+
+  @media (max-width: 768px) {
+    min-width: auto;
+  }
+}
+
+.user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.full-width {
+  width: 100%;
+  
+  ::ng-deep {
+    .mat-mdc-text-field-wrapper {
+      background-color: #f9fafb;
+      border-radius: 12px;
+    }
+
+    .mdc-text-field--outlined {
+      .mdc-notched-outline {
+        .mdc-notched-outline__leading,
+        .mdc-notched-outline__notch,
+        .mdc-notched-outline__trailing {
+          border-color: #e5e7eb;
+          border-width: 1.5px;
+        }
+      }
+      
+      &:hover .mdc-notched-outline {
+        .mdc-notched-outline__leading,
+        .mdc-notched-outline__notch,
+        .mdc-notched-outline__trailing {
+          border-color: #9ca3af;
+        }
+      }
+    }
+
+    .mat-mdc-form-field.mat-focused {
+      .mdc-notched-outline {
+        .mdc-notched-outline__leading,
+        .mdc-notched-outline__notch,
+        .mdc-notched-outline__trailing {
+          border-color: #FF9933;
+          border-width: 2px;
+        }
+      }
+    }
+
+    .mat-mdc-input-element {
+      padding: 14px 16px;
+      font-size: 15px;
+      color: #1f2937;
+      
+      &::placeholder {
+        color: #9ca3af;
+        opacity: 1;
+      }
+    }
+
+    .mat-icon {
+      color: #6b7280;
+      margin-right: 8px;
+    }
+
+    .mat-mdc-icon-button {
+      .mat-icon {
+        margin-right: 0;
+      }
+    }
+
+    .mat-mdc-select {
+      .mat-mdc-select-value {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    }
+  }
+}
+
+.dialog-actions {
+  padding: 16px 24px 24px !important;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+
+  button {
+    min-width: 120px;
+    height: 44px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  .create-button {
+    background: #FF9933;
+    color: white;
+
+    &:hover:not(:disabled) {
+      background: #FF8800;
+    }
+
+    mat-icon {
+      margin-right: 8px;
+    }
+  }
+}
+
+::ng-deep .mat-mdc-option {
+  .mdc-list-item__primary-text {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: #6b7280;
+  }
+
+  &.mat-mdc-option-active mat-icon {
+    color: #FF9933;
+  }
+}

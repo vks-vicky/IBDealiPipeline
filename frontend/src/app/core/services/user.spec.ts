@@ -7,11 +7,11 @@ describe('UserService', () => {
   let service: UserService;
   let http: HttpTestingController;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [UserService]
-    });
+    }).compileComponents();
 
     service = TestBed.inject(UserService);
     http = TestBed.inject(HttpTestingController);
@@ -28,7 +28,7 @@ describe('UserService', () => {
       expect(res).toEqual(mockUsers);
     });
 
-    const req = http.expectOne(`${environment.apiUrl}/users`);
+    const req = http.expectOne(`${environment.apiUrl}/admin/users`);
     expect(req.request.method).toBe('GET');
 
     req.flush(mockUsers);

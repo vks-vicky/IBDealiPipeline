@@ -1,36 +1,81 @@
-<mat-card>
-    <h2>{{ isEdit ? 'Edit Deal' : 'Create Deal' }}</h2>
+<div class="dialog-container">
+  <div class="dialog-header">
+    <h2 mat-dialog-title>{{ isEdit ? 'Edit Deal' : 'Create New Deal' }}</h2>
+    <button mat-icon-button (click)="cancel()" class="close-button">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
 
-    <form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content>
+    <form [formGroup]="form" (ngSubmit)="submit()" class="deal-form">
+      
+      <div class="form-row">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Client Name</mat-label>
+          <input matInput formControlName="clientName" placeholder="Enter client name">
+          <mat-icon matPrefix>business</mat-icon>
+        </mat-form-field>
+      </div>
 
-        <mat-form-field class="full">
-            <mat-label>Client Name</mat-label>
-            <input matInput formControlName="clientName">
+      <div class="form-row two-col">
+        <mat-form-field appearance="outline">
+          <mat-label>Sector</mat-label>
+          <mat-select formControlName="sector">
+            <mat-option *ngFor="let sector of sectors" [value]="sector">
+              {{ sector }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matPrefix>category</mat-icon>
         </mat-form-field>
 
-        <mat-form-field class="full">
-            <mat-label>Sector</mat-label>
-            <input matInput formControlName="sector">
+        <mat-form-field appearance="outline">
+          <mat-label>Deal Type</mat-label>
+          <mat-select formControlName="dealType">
+            <mat-option *ngFor="let type of dealTypes" [value]="type">
+              {{ type }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matPrefix>assignment</mat-icon>
         </mat-form-field>
+      </div>
 
-        <mat-form-field class="full">
-            <mat-label>Deal Type</mat-label>
-            <input matInput formControlName="dealType">
+      <div class="form-row">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Summary</mat-label>
+          <textarea 
+            matInput 
+            formControlName="summary" 
+            rows="4"
+            placeholder="Brief description of the deal..."
+          ></textarea>
+          <mat-icon matPrefix>description</mat-icon>
         </mat-form-field>
+      </div>
 
-        <mat-form-field class="full">
-            <mat-label>Summary</mat-label>
-            <textarea matInput formControlName="summary"></textarea>
+      <div class="form-row" *ngIf="isAdmin">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Deal Value (USD)</mat-label>
+          <input matInput type="number" formControlName="dealValue" placeholder="Enter deal value">
+          <mat-icon matPrefix>attach_money</mat-icon>
         </mat-form-field>
+      </div>
 
-        <!-- ADMIN ONLY -->
-        <mat-form-field class="full" *ngIf="isAdmin">
-            <mat-label>Deal Value</mat-label>
-            <input matInput type="number" formControlName="dealValue">
-        </mat-form-field>
-
-        <button mat-raised-button color="primary">
-            {{ isEdit ? 'Update' : 'Create' }}
-        </button>
     </form>
-</mat-card>
+  </mat-dialog-content>
+
+  <mat-dialog-actions>
+    <button mat-stroked-button (click)="cancel()" type="button">
+      Cancel
+    </button>
+    <button 
+      mat-raised-button 
+      color="primary" 
+      (click)="submit()"
+      [disabled]="form.invalid"
+      class="submit-button"
+    >
+      <mat-icon>{{ isEdit ? 'save' : 'add' }}</mat-icon>
+      {{ isEdit ? 'Update Deal' : 'Create Deal' }}
+    </button>
+  </mat-dialog-actions>
+</div>

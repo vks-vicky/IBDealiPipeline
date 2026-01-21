@@ -64,8 +64,8 @@ describe('DealList', () => {
     expect(html.textContent).toContain('Prospect');
 
     // admin-only content should not appear
-    expect(html.textContent).not.toContain('Delete');
-    expect(html.textContent).not.toContain('1,000');
+    expect(html.textContent).not.toContain('Delete Deal');
+    expect(html.textContent).not.toContain('$1.0K');
   });
 
   it('should render ADMIN columns and actions', () => {
@@ -77,12 +77,15 @@ describe('DealList', () => {
 
     const html = fixture.nativeElement as HTMLElement;
 
-    expect(html.textContent).toContain('1,000');
-    expect(html.textContent).toContain('2,000');
-    expect(html.textContent).toContain('Delete');
-
-    const deleteButtons = html.querySelectorAll('button');
-    expect(deleteButtons.length).toBeGreaterThan(0);
+    expect(html.textContent).toContain('$1.0K');
+    expect(html.textContent).toContain('$2.0K');
+    
+    // Check for action menu button (more_vert icon)
+    const menuButtons = html.querySelectorAll('button mat-icon');
+    const hasMoreVertIcon = Array.from(menuButtons).some(btn => 
+      btn.textContent?.includes('more_vert')
+    );
+    expect(hasMoreVertIcon).toBe(true);
   });
 
   it('should call deleteDeal when admin clicks delete', () => {
@@ -93,22 +96,23 @@ describe('DealList', () => {
     fixture.detectChanges();
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const mockEvent = new Event('click');
 
-    const btn = fixture.nativeElement.querySelector('button[color="warn"]') as HTMLButtonElement;
-    btn.click();
+    component.deleteDeal('1', mockEvent);
 
     expect(dealMock.deleteDeal).toHaveBeenCalledWith('1');
   });
 
-  it('should have create-deal navigation button', () => {
+  it('should have create-deal dialog button', () => {
     authMock.getRole.mockReturnValue('USER');
 
     fixture = TestBed.createComponent(DealList);
     component = fixture.componentInstance;
     fixture.detectChanges();
 
-    const createBtn = fixture.nativeElement.querySelector('button[routerLink]');
+    const createBtn = fixture.nativeElement.querySelector('button.create-button');
     expect(createBtn).toBeTruthy();
+    expect(createBtn.textContent).toContain('Create New Deal');
   });
 
   it('should render router link for deal detail', () => {

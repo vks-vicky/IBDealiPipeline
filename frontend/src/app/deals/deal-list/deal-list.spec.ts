@@ -42,10 +42,10 @@ describe('DealList', () => {
     component.ngOnInit();
 
     expect(component.isAdmin).toBe(false);
-    expect(component.displayedColumns).toEqual([
-      'clientName',
+    expect(component.columns).toEqual([
+      'client',
       'sector',
-      'dealType',
+      'type',
       'stage'
     ]);
     expect(dealMock.getAllDeals).toHaveBeenCalled();
@@ -59,11 +59,11 @@ describe('DealList', () => {
     component.ngOnInit();
 
     expect(component.isAdmin).toBe(true);
-    expect(component.displayedColumns).toEqual([
-      'clientName',
+    expect(component.columns).toEqual([
+      'client',
       'sector',
-      'dealType',
-      'dealValue',
+      'type',
+      'value',
       'stage',
       'actions'
     ]);
@@ -78,7 +78,8 @@ describe('DealList', () => {
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    component.deleteDeal('1');
+    const mockEvent = new Event('click');
+    component.deleteDeal('1', mockEvent);
 
     expect(dealMock.deleteDeal).toHaveBeenCalledWith('1');
     expect(dealMock.getAllDeals).toHaveBeenCalledTimes(2); // init + reload
@@ -87,7 +88,8 @@ describe('DealList', () => {
   it('should not delete when confirm is false', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
 
-    component.deleteDeal('1');
+    const mockEvent = new Event('click');
+    component.deleteDeal('1', mockEvent);
 
     expect(dealMock.deleteDeal).not.toHaveBeenCalled();
   });

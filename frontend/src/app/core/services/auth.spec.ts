@@ -7,11 +7,11 @@ describe('AuthService', () => {
   let service: AuthService;
   let http: HttpTestingController;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [AuthService]
-    });
+    }).compileComponents();
 
     service = TestBed.inject(AuthService);
     http = TestBed.inject(HttpTestingController);

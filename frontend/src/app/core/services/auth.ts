@@ -2,12 +2,21 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { LoginRequest, LoginResponse } from '../../shared/models/auth.model';
-import { tap } from 'rxjs';
+import { tap, Observable } from 'rxjs';
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  active: boolean;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
 
   private baseUrl = `${environment.apiUrl}/auth`;
+  private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) { }
 
@@ -20,6 +29,10 @@ export class AuthService {
           localStorage.setItem('role', res.role);
         })
       );
+  }
+
+  getCurrentUser(): Observable<User> {
+    return this.http.get<User>(`${this.apiUrl}/users/me`);
   }
 
   logout() {

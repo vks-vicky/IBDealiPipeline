@@ -46,23 +46,24 @@ describe('UserManagement', () => {
   });
 
   it('should show correct action labels', () => {
-    const buttons = fixture.nativeElement.querySelectorAll('td button');
+    const toggles = fixture.nativeElement.querySelectorAll('mat-slide-toggle');
 
-    expect(buttons[0].textContent).toContain('Deactivate'); // alice = active
-    expect(buttons[1].textContent).toContain('Activate');   // bob = inactive
+    expect(toggles.length).toBe(2); // one toggle per user
+    expect(toggles[0].classList.contains('toggle-active')).toBe(true); // alice = active
+    expect(toggles[1].classList.contains('toggle-inactive')).toBe(true); // bob = inactive
   });
 
   it('should call updateStatus when clicking action button', () => {
-    const buttons = fixture.nativeElement.querySelectorAll('td button');
-
-    buttons[0].click(); // alice → deactivate
+    const toggle = component.paginatedUsers[0]; // alice
+    component.toggle(toggle);
 
     expect(userMock.updateStatus).toHaveBeenCalledWith('1', false);
   });
 
-  it('should have create-user navigation button', () => {
-    const link = fixture.nativeElement.querySelector('button[routerLink]');
+  it('should have create-user dialog button', () => {
+    const btn = fixture.nativeElement.querySelector('button.create-button');
 
-    expect(link).toBeTruthy();
+    expect(btn).toBeTruthy();
+    expect(btn.textContent).toContain('Add New User');
   });
 });

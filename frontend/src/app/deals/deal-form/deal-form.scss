@@ -1,0 +1,113 @@
+.dialog-container {
+  width: 100%;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+
+  h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .close-button {
+    color: #6b7280;
+
+    &:hover {
+      color: #1f2937;
+      background: #f3f4f6;
+    }
+  }
+}
+
+mat-dialog-content {
+  padding: 24px;
+  max-height: 60vh;
+}
+
+.deal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+
+  &.two-col {
+    mat-form-field {
+      flex: 1;
+    }
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+mat-form-field {
+  ::ng-deep {
+    .mat-mdc-text-field-wrapper {
+      background-color: #f9fafb;
+    }
+
+    .mat-mdc-form-field-infix {
+      padding: 14px 0;
+    }
+
+    .mat-mdc-input-element,
+    .mat-mdc-select {
+      font-size: 14px;
+    }
+
+    .mat-icon {
+      color: #9ca3af;
+      margin-right: 8px;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+  }
+}
+
+mat-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #e5e7eb;
+  margin: 0;
+
+  button {
+    min-width: 120px;
+  }
+
+  .submit-button {
+    background: #2563eb !important;
+    color: white !important;
+
+    mat-icon {
+      margin-right: 8px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    &:hover:not(:disabled) {
+      background: #1d4ed8 !important;
+    }
+
+    &:disabled {
+      background: #e5e7eb !important;
+      color: #9ca3af !important;
+    }
+  }
+}
